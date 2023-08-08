@@ -7,7 +7,7 @@ rule-providers:
   JohnHK-AD:
     type: http
     behavior: domain
-    url: "https://raw.githubusercontent.com/CHNJohnHK/Clash-Rules/main/johnhk-ad.yaml"
+    url: "https://raw.githubusercontent.com/CHNJohnHK/clash-rules/main/rules/johnhk-ad.yaml"
     path: ./ruleset/johnhk-ad.yaml
     interval: 86400
 ```
