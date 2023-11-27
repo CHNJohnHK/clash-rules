@@ -1,0 +1,718 @@
+######### 锚点 start #######
+# proxy 相关
+pr: &pr {type: select, proxies: [✈️ 默认, 🇭🇰 香港, 🇯🇵 日本, 🇸🇬 新加坡, 🇺🇸 美国, 🌐 全部节点, ♻️ 自动选择, ❌️ 故障转移, DIRECT]}
+
+# 订阅更新和延迟测试相关
+p: &p {type: http, interval: 3600, health-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
+
+# Rule-Provider
+rd: &rd {type: http, behavior: domain, interval: 86400}
+
+use: &use
+  type: select
+  use:
+  - sub1
+  - sub2
+  
+######### 锚点 end #######
+
+proxy-providers:
+  sub1: 
+    <<: *p
+    url: "https://www.example.com"
+    path: ./proxy_providers/sub1.yaml
+  
+  sub2:
+    <<: *p
+    url: "https://www.example.com"
+    path: ./proxy_providers/sub2.yaml
+    
+mixed-port: 7890
+unified-delay: false
+geodata-mode: true
+tcp-concurrent: true
+find-process-mode: strict
+global-client-fingerprint: chrome
+
+allow-lan: true
+mode: rule
+log-level: info
+ipv6: true
+
+external-controller: 0.0.0.0:9090
+#external-ui: ui
+secret: ""
+
+geox-url:
+  geoip: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat"
+  geosite: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
+  mmdb: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb"
+
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+sniffer:
+  enable: false
+  sniff:
+    TLS:
+      ports: [443, 8443]
+    HTTP:
+      ports: [80, 8080-8880]
+      override-destination: true
+
+tun:
+  enable: true
+  stack: system
+  dns-hijack:
+    - 'any:53'
+  auto-route: true
+  auto-detect-interface: true
+
+dns:
+  enable: true
+  listen: 0.0.0.0:1053
+  ipv6: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 28.0.0.1/8
+  fake-ip-filter:
+    - '+.lan'
+    - '+.ntp.org.cn'
+    - '+.msftconnecttest.com'
+    - '+.msftncsi.com'
+    - '*'
+    - '*.xboxlive.com'
+    - '*.mcdn.bilivideo.cn'
+    - '*.msftncsi.com'
+    - '*.msftconnecttest.com'
+    - '*.*.*.*.srv.nintendo.net'
+    - '*.*.*.stun.playstation.net'
+    - '*.*.*.xboxlive.com'
+    - 'xbox.*.microsoft.com'
+    - 'ntp.*.com'
+    - 'time.*.com'
+    - 'ntp?.*.com'
+    - 'time?.*.com'
+    - 'time.*.gov'
+    - 'time.*.edu.cn'
+    - 'time.*.apple.com'
+    - 'PDC._msDCS.*.*'
+    - 'DC._msDCS.*.*'
+    - 'GC._msDCS.*.*'
+    - 'stun.*'
+    - 'lens.l.google.com'
+    - 'speedtest.cros.wr.pvp.net'
+    - 'cable.auth.com'
+    - 'network-test.debian.org'
+    - 'detectportal.firefox.com'
+    - 'resolver1.opendns.com'
+    - 'global.turn.twilio.com'
+    - 'global.stun.twilio.com'
+    - 'localhost.ptlogin2.qq.com'
+  fallback:
+    - tls://8.8.4.4
+    - tls://1.1.1.1
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    geosite:
+      - gfw
+    ipcidr:
+      - 240.0.0.0/4
+    domain:
+      - '+.google.com'
+      - '+.facebook.com'
+      - '+.youtube.com'
+  default-nameserver:
+    - 114.114.114.114
+    - 223.5.5.5
+  nameserver:
+    - 'tls://8.8.4.4#🌐 dns'
+    - 'tls://1.0.0.1#🌐 dns'
+  proxy-server-nameserver:
+    - https://doh.pub/dns-query
+  nameserver-policy:
+    "geosite:cn,private":
+      - https://doh.pub/dns-query
+      - https://dns.alidns.com/dns-query
+
+proxy-groups:
+#地区
+
+  - {name: 🇭🇰 香港, <<: *use, filter: "(?i)^(?!.*(?:IN|美国|韩国)).*(🇭🇰|港|hk|hongkong|hong kong)"}
+
+  - {name: 🇯🇵 日本, <<: *use, filter: "(?i)(🇯🇵|日本|jp|japan)"}
+
+  - {name: 🇺🇸 美国, <<: *use, filter: "(?i)(🇺🇸|美|us|unitedstates|(?i)united states)"}
+
+  - {name: 🇸🇬 新加坡, <<: *use, filter: "(?i)^(?!.*(?:us)).*(🇸🇬|新|sg|singapore)"}
+
+  - {name: 🌐 全部节点, <<: *use}
+  
+# 其他分组
+
+  - {name: ♻️ 自动选择, type: url-test, tolerance: 2, <<: *use}
+  
+  - {name: ❌️ 故障转移, type: fallback, <<: *use, url: 'http://www.gstatic.com/generate_204', interval: 7200}
+  
+  - {name: ✈️ 默认, type: select, proxies: [DIRECT, 🇭🇰 香港, 🇯🇵 日本, 🇸🇬 新加坡, 🇺🇸 美国, 🌐 全部节点, ♻️ 自动选择, ❌️ 故障转移]}
+
+  - {name: 🌐 dns, <<: *pr}
+  
+  - {name: 🎮 Steam, <<: *pr}
+  
+  - {name: 🎮 CN Game, <<: *pr}
+  
+  - {name: 🍎 Apple, <<: *pr}
+
+  - {name: 📰 Google, <<: *pr}
+  
+  - {name: 🤖 OpenAI, <<: *pr}
+
+  - {name: 💬 即时通讯, <<: *pr}
+
+  - {name: 📫 社交媒体, <<: *pr}
+  
+  - {name: 🖥 流媒体, <<: *pr}
+  
+  - {name: 🖥 哔哩哔哩, <<: *pr}
+  
+  - {name: ❌️ 广告, type: select, proxies: [DIRECT, REJECT]}
+  
+  - {name: 🐟 漏网之鱼, <<: *pr}
+  
+rule-providers:
+  reject:
+    <<: *rd
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/reject.txt"
+    path: ./ruleset/reject.yaml
+    
+  AntiAD:
+    <<: *rd
+    url: "https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-clash.yaml"
+    path: ./ruleset/AntiAD.yaml
+    
+  JohnHK-AD:
+    <<: *rd
+    url: "https://raw.githubusercontent.com/CHNJohnHK/clash-rules/main/rules/johnhk-ad.yaml"
+    path: ./ruleset/johnhk-ad.yaml
+    
+rules:
+  # RULE-SET
+  - RULE-SET,reject,❌️ 广告
+  - RULE-SET,AntiAD,❌️ 广告
+  - RULE-SET,JohnHK-AD,❌️ 广告
+  # ad block ------
+  - GEOSITE,category-ads-all,❌️ 广告
+  - DOMAIN-KEYWORD,analytics,❌️ 广告
+  - DOMAIN-KEYWORD,duomeng,❌️ 广告
+  - DOMAIN-KEYWORD,track,❌️ 广告
+  - DOMAIN-KEYWORD,traffic,❌️ 广告
+  - DOMAIN-KEYWORD,adsmogo,❌️ 广告
+  - DOMAIN-SUFFIX,adwo.com,❌️ 广告
+  - DOMAIN-SUFFIX,ad.unimhk.com,❌️ 广告
+  - DOMAIN-SUFFIX,aduu.cn,❌️ 广告
+  - DOMAIN-SUFFIX,advertising.com,❌️ 广告
+  - DOMAIN-SUFFIX,adview.cn,❌️ 广告
+  - DOMAIN-SUFFIX,adwhirl.com,❌️ 广告 
+  - DOMAIN-SUFFIX,adwo.com,❌️ 广告
+  - DOMAIN-SUFFIX,adxmi.com,❌️ 广告
+  - DOMAIN-SUFFIX,adzerk.net,❌️ 广告
+  - DOMAIN-SUFFIX,anquan.org,❌️ 广告
+  - DOMAIN-SUFFIX,appads.com,❌️ 广告
+  - DOMAIN-SUFFIX,applifier.com,❌️ 广告
+  - DOMAIN-SUFFIX,appsflyer.com,❌️ 广告
+  - DOMAIN-SUFFIX,baidustatic.com,❌️ 广告
+  - DOMAIN-SUFFIX,baifendian.com,❌️ 广告
+  - DOMAIN-SUFFIX,bam.nr-data.net,❌️ 广告
+  - DOMAIN-SUFFIX,beacon.sina.com.cn,❌️ 广告
+  - DOMAIN-SUFFIX,cnzz.com,❌️ 广告
+  - DOMAIN-SUFFIX,domob.com.cn,❌️ 广告
+  - DOMAIN-SUFFIX,domob.org,❌️ 广告
+  - DOMAIN-SUFFIX,doubleclick.net,❌️ 广告 #
+  - DOMAIN-SUFFIX,duomeng.cn,❌️ 广告
+  - DOMAIN-SUFFIX,duomeng.net,❌️ 广告
+  - DOMAIN-SUFFIX,duomeng.org,❌️ 广告
+  - DOMAIN-SUFFIX,flurry.com,❌️ 广告
+  - DOMAIN-SUFFIX,googeadsserving.cn,❌️ 广告
+  - DOMAIN-SUFFIX,guomob.com,❌️ 广告
+  - DOMAIN-SUFFIX,inmobi.com,❌️ 广告
+  - DOMAIN-SUFFIX,immob.cn,❌️ 广告
+  - DOMAIN-SUFFIX,intely.cn,❌️ 广告
+  - DOMAIN-SUFFIX,kejet.net,❌️ 广告
+  - DOMAIN-SUFFIX,localytics.com,❌️ 广告
+  - DOMAIN-SUFFIX,mobads.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,mobads-logs.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,smartadserver.com,❌️ 广告
+  - DOMAIN-SUFFIX,tapjoyads.com,❌️ 广告
+  - DOMAIN-SUFFIX,m.simaba.taobao.com,❌️ 广告
+  - DOMAIN-SUFFIX,mmstat.com,❌️ 广告
+  - DOMAIN-SUFFIX,sax.sina.cn,❌️ 广告
+  - DOMAIN-SUFFIX,tapjoyads.com,❌️ 广告
+  - DOMAIN-SUFFIX,tiqcdn.com,❌️ 广告
+  - DOMAIN-SUFFIX,umtrack.com,❌️ 广告
+  - DOMAIN-SUFFIX,umeng.co,❌️ 广告
+  - DOMAIN-SUFFIX,umeng.com,❌️ 广告
+  - DOMAIN-SUFFIX,umeng.net,❌️ 广告
+  - DOMAIN-SUFFIX,ushaqi.com,❌️ 广告
+  - DOMAIN-SUFFIX,uyunad.com,❌️ 广告
+  - DOMAIN-SUFFIX,waps.cn,❌️ 广告
+  - DOMAIN-SUFFIX,wiyun.com,❌️ 广告
+  - DOMAIN-SUFFIX,wooboo.com.cn,❌️ 广告
+  - DOMAIN-SUFFIX,wqmobile.com,❌️ 广告
+  - DOMAIN-SUFFIX,x.jd.com,❌️ 广告
+  - DOMAIN-SUFFIX,youmi.net,❌️ 广告
+  - DOMAIN-SUFFIX,zhiziyun.com,❌️ 广告
+  - DOMAIN,bam.nr-data.net,❌️ 广告
+  - DOMAIN,counter.kingsoft.com,❌️ 广告
+  - DOMAIN,js-agent.newrelic.com,❌️ 广告
+  # Youku
+  - DOMAIN-SUFFIX,atm.youku.com,❌️ 广告
+  - DOMAIN,ad.api.3g.youku.com,❌️ 广告
+  - DOMAIN,ad.api.3g.tudou.com,❌️ 广告
+  # Alibaba
+  - DOMAIN,acjs.aliyun.com,❌️ 广告
+  - DOMAIN,adash.m.taobao.com,❌️ 广告
+  - DOMAIN-SUFFIX,simaba.taobao.com,❌️ 广告
+  # Google
+  - DOMAIN-SUFFIX,googletraveladservices.com,❌️ 广告
+  - DOMAIN-SUFFIX,tetrack.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,tpns.tencent.com,❌️ 广告
+  - DOMAIN,dl.google.com,❌️ 广告
+  - DOMAIN,safebrowsing.googleapis.com,❌️ 广告
+  - DOMAIN,pagead2.googlesyndication.com,❌️ 广告
+  - DOMAIN,googleads.g.doubleclick.net,❌️ 广告
+  - DOMAIN,ade.googlesyndication.com,❌️ 广告
+  - DOMAIN,googleads4.g.doubleclick.net,❌️ 广告
+  # Tencent
+  - DOMAIN-SUFFIX,btrace.video.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,c.l.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,dp3.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,livep.l.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,lives.l.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,livew.l.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,mcgi.v.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,mdevstat.qqlive.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,omgmta1.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,p.l.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,rcgi.video.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,t.l.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,u.l.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,tbs.imtt.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,api.poll.video.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,static-res.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,stat.tpns.tencent.com,❌️ 广告
+  - DOMAIN-SUFFIX,e.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,gdt.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,l.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,mi.gdt.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,jcollection.shuqireader.com,❌️ 广告
+  - DOMAIN-SUFFIX,stats.jpush.cn,❌️ 广告
+  - DOMAIN-SUFFIX,sdk.kaijiawan.com,❌️ 广告
+  - DOMAIN-SUFFIX,gdt.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,pingtcss.qq.com,❌️ 广告
+  - DOMAIN-SUFFIX,report.qq.com,❌️ 广告
+  - DOMAIN,h.trace.qq.com,❌️ 广告
+  - DOMAIN,monitor.uu.qq.com,❌️ 广告
+  - DOMAIN,pingjs.qq.com,❌️ 广告
+  - DOMAIN,pingma.qq.com,❌️ 广告
+  - DOMAIN,tajs.qq.com,❌️ 广告
+  - DOMAIN,adsmind.apdcdn.tc.qq.com,❌️ 广告
+  - DOMAIN,adsmind.gdtimg.com,❌️ 广告
+  - DOMAIN,adsmind.tc.qq.com,❌️ 广告
+  - DOMAIN,btrace.qq.com,❌️ 广告
+  - DOMAIN,pgdt.gtimg.cn,❌️ 广告
+  - DOMAIN,pgdt.gtimg.com,❌️ 广告
+  - DOMAIN,pgdt.ugdtimg.com,❌️ 广告
+  - DOMAIN,splashqqlive.gtimg.com,❌️ 广告
+  - DOMAIN,wa.gtimg.com,❌️ 广告
+  - DOMAIN,wxsnsdy.wxs.qq.com,❌️ 广告
+  - DOMAIN,wxsnsdythumb.wxs.qq.com,❌️ 广告
+  - DOMAIN,mi.gdt.qq.com,❌️ 广告
+  - DOMAIN,ios.bugly.qq.com,❌️ 广告
+  - DOMAIN,pingma.qq.com,❌️ 广告
+  - DOMAIN,adsmind.tc.qq.com,❌️ 广告
+  - DOMAIN,wxsnsdy.wxs.qq.com,❌️ 广告
+    # Baidu
+  - DOMAIN-SUFFIX,cpro.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,eclick.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,entry.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,hmma.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,mobads-logs.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,mobads.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,mtj.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,nsclick.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,static.tieba.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,ucstat.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,union.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,imageplus.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,t10.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,t11.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,t12.baidu.com,❌️ 广告
+  - DOMAIN,hpd.baidu.com,❌️ 广告
+  - DOMAIN,hm.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,pos.baidu.com,❌️ 广告
+  - DOMAIN,cr-nielsen.com,❌️ 广告
+  - DOMAIN,cbjs.baidu.com,❌️ 广告
+  - DOMAIN,cpro.baidu.com,❌️ 广告
+  - DOMAIN,eclick.baidu.com,❌️ 广告
+  - DOMAIN,mobads-logs.baidu.com,❌️ 广告
+  - DOMAIN,mobads.baidu.com,❌️ 广告
+  - DOMAIN,mtj.baidu.com,❌️ 广告
+  - DOMAIN,nsclick.baidu.com,❌️ 广告
+  - DOMAIN-SUFFIX,baidustatic.com,❌️ 广告
+  - DOMAIN-SUFFIX,pos.baidu.com,❌️ 广告
+  - DOMAIN,afd.baidu.com,❌️ 广告
+  - DOMAIN,als.baidu.com,❌️ 广告
+  - DOMAIN,duclick.baidu.com,❌️ 广告
+  - DOMAIN,mobads.baidu.com,❌️ 广告
+  - DOMAIN,mobads-logs.baidu.com,❌️ 广告
+  - DOMAIN,nsclick.baidu.com,❌️ 广告
+  - IP-CIDR,60.210.17.12/24,❌️ 广告
+  # 高德地图
+  - DOMAIN,optimus-ads.amap.com,❌️ 广告
+  - DOMAIN-SUFFIX,izatcloud.net,❌️ 广告
+  - DOMAIN,xtrapath1.izatcloud.net,❌️ 广告
+  - DOMAIN,xtrapath2.izatcloud.net,❌️ 广告
+  - DOMAIN,xtrapath3.izatcloud.net,❌️ 广告
+  - DOMAIN,info.izatcloud.net,❌️ 广告
+  - DOMAIN,time.izatcloud.net,❌️ 广告
+  - DOMAIN,s2s.izatcloud.net,❌️ 广告
+  # 广告联盟 
+  - DOMAIN-SUFFIX,doubleclick.net,❌️ 广告
+  - DOMAIN-SUFFIX,zhihu-analytics.zhihu.com,❌️ 广告
+  - DOMAIN-SUFFIX,log.cmbchina.com,❌️ 广告
+  - DOMAIN-SUFFIX,api.segment.io,❌️ 广告
+  - DOMAIN-SUFFIX,api.instabug.com,❌️ 广告
+  - DOMAIN-SUFFIX,adlog.flurry.com,❌️ 广告
+  - DOMAIN-SUFFIX,ads.flurry.com,❌️ 广告
+  - DOMAIN-SUFFIX,sd.domob.cn,❌️ 广告
+  - DOMAIN-SUFFIX,adjust.com,❌️ 广告
+  - DOMAIN-SUFFIX,adjust.io,❌️ 广告
+  - DOMAIN-SUFFIX,beacon.tingyun.com,❌️ 广告
+  - DOMAIN-SUFFIX,cmcore.com,❌️ 广告
+  - DOMAIN-SUFFIX,coremetrics.com,❌️ 广告
+  - DOMAIN-SUFFIX,irs01.com,❌️ 广告
+  - DOMAIN-SUFFIX,madmini.com,❌️ 广告
+  - DOMAIN-SUFFIX,optimizelyapis.com,❌️ 广告
+  - DOMAIN-SUFFIX,sitemeter.com,❌️ 广告
+  - DOMAIN-SUFFIX,wrating.com,❌️ 广告
+  - DOMAIN-SUFFIX,99click.com,❌️ 广告
+  - DOMAIN-SUFFIX,acs86.com,❌️ 广告
+  - DOMAIN-SUFFIX,adchina.com,❌️ 广告
+  - DOMAIN-SUFFIX,adcome.cn,❌️ 广告
+  - DOMAIN-SUFFIX,adinfuse.com,❌️ 广告
+  - DOMAIN-SUFFIX,adsmogo.org,❌️ 广告
+  - DOMAIN-SUFFIX,aduu.cn,❌️ 广告
+  - DOMAIN-SUFFIX,advertising.com,❌️ 广告
+  - DOMAIN-SUFFIX,adview.cn,❌️ 广告
+  - DOMAIN-SUFFIX,adwhirl.com,❌️ 广告
+  - DOMAIN-SUFFIX,adwo.com,❌️ 广告
+  - DOMAIN-SUFFIX,adxmi.com,❌️ 广告
+  - DOMAIN-SUFFIX,adzerk.net,❌️ 广告
+  - DOMAIN-SUFFIX,allyes.com,❌️ 广告
+  - DOMAIN-SUFFIX,anquan.org,❌️ 广告
+  - DOMAIN-SUFFIX,appads.com,❌️ 广告
+  - DOMAIN-SUFFIX,applifier.com,❌️ 广告
+  - DOMAIN-SUFFIX,applovin.com,❌️ 广告
+  - DOMAIN-SUFFIX,chartboost.com,❌️ 广告
+  - DOMAIN-SUFFIX,clicktracks.com,❌️ 广告
+  - DOMAIN-SUFFIX,clickzs.com,❌️ 广告
+  - DOMAIN-SUFFIX,guohead.com,❌️ 广告
+  - DOMAIN-SUFFIX,guomob.com,❌️ 广告
+  - DOMAIN-SUFFIX,immob.cn,❌️ 广告
+  - DOMAIN-SUFFIX,inmobi.com,❌️ 广告
+  - DOMAIN-SUFFIX,intely.cn,❌️ 广告
+  - DOMAIN-SUFFIX,ipinyou.com,❌️ 广告
+  - DOMAIN-SUFFIX,localytics.com,❌️ 广告
+  - DOMAIN-SUFFIX,mediav.com,❌️ 广告
+  - DOMAIN-SUFFIX,mobclix.com,❌️ 广告
+  - DOMAIN-SUFFIX,optaim.com,❌️ 广告
+  - DOMAIN-SUFFIX,quantserve.com,❌️ 广告
+  - DOMAIN-SUFFIX,responsys.net,❌️ 广告
+  - DOMAIN-SUFFIX,serving-sys.com,❌️ 广告
+  - DOMAIN-SUFFIX,smartmad.com,❌️ 广告
+  - DOMAIN-SUFFIX,smartadserver.com,❌️ 广告
+  - DOMAIN-SUFFIX,sponsorpay.com,❌️ 广告
+  - DOMAIN-SUFFIX,switchadhub.com,❌️ 广告
+  - DOMAIN-SUFFIX,thoughtleadr.com,❌️ 广告
+  - DOMAIN-SUFFIX,unimhk.com,❌️ 广告
+  - DOMAIN-SUFFIX,unlitui.com,❌️ 广告
+  - DOMAIN-SUFFIX,uyunad.com,❌️ 广告
+  - DOMAIN-SUFFIX,vamaker.com,❌️ 广告
+  - DOMAIN-SUFFIX,waps.cn,❌️ 广告
+  - DOMAIN-SUFFIX,wiyun.com,❌️ 广告
+  - DOMAIN-SUFFIX,wooboo.com.cn,❌️ 广告
+  - DOMAIN-SUFFIX,wqmobile.com,❌️ 广告
+  - DOMAIN-SUFFIX,youmi.net,❌️ 广告
+  - DOMAIN-SUFFIX,zhiziyun.com,❌️ 广告
+  - DOMAIN-SUFFIX,segment.com,❌️ 广告
+  - DOMAIN-SUFFIX,taboola.com,❌️ 广告
+  - DOMAIN-SUFFIX,trc.taboola.com,❌️ 广告
+  - DOMAIN-SUFFIX,.inmobi.cn,❌️ 广告
+  - DOMAIN-SUFFIX,.criteo.com,❌️ 广告
+  # 爱奇艺
+  - DOMAIN-SUFFIX,upqzfile.com,❌️ 广告
+  - DOMAIN-SUFFIX,cupid.iqiyi.com,❌️ 广告
+  - DOMAIN-SUFFIX,afdback.ppsimg.com,❌️ 广告
+  - DOMAIN-SUFFIX,miaozhen.com,❌️ 广告
+  - DOMAIN,msga.71.am,❌️ 广告
+  - DOMAIN,msg.71.am,❌️ 广告
+  - DOMAIN,cr-status.iqiyi.com,❌️ 广告
+  - DOMAIN,f74f7f7765f8a2f6.ngaa.net.cn,❌️ 广告
+  - DOMAIN,ef-dongfeng.tanx.com,❌️ 广告
+  - DOMAIN,iqiyim.adtrack.enlightent.cn,❌️ 广告
+  - DOMAIN,paopao-monitor.iqiyi.com,❌️ 广告
+  - DOMAIN,puma-api.iqiyi.com,❌️ 广告
+  - DOMAIN,mbdlog.iqiyi.com,❌️ 广告
+  - DOMAIN,myg.qy.net,❌️ 广告
+  - DOMAIN,www.qchannel01.cn,❌️ 广告
+  - DOMAIN,iqiyi-mipdx.cn.miaozhen.com,❌️ 广告
+  - DOMAIN,show.ssports.com,❌️ 广告
+  # 不知名
+  - DOMAIN-SUFFIX,admaster.com.cn,❌️ 广告
+  - DOMAIN-SUFFIX,lh1.ggpht.com,❌️ 广告
+  - DOMAIN-SUFFIX,lh2.ggpht.com,❌️ 广告
+  - DOMAIN-SUFFIX,lh3.ggpht.com,❌️ 广告
+  - DOMAIN-SUFFIX,lh4.ggpht.com,❌️ 广告
+  - DOMAIN-SUFFIX,lh5.ggpht.com,❌️ 广告
+  - DOMAIN-SUFFIX,lh6.ggpht.com,❌️ 广告
+  - DOMAIN-SUFFIX,lh7.ggpht.com,❌️ 广告
+  - DOMAIN-SUFFIX,lh8.ggpht.com,❌️ 广告
+  - DOMAIN-SUFFIX,www.panoramio.com,❌️ 广告
+  - DOMAIN,ads.mopub.com,❌️ 广告
+  - DOMAIN,ark.letv.com,❌️ 广告
+  - DOMAIN,asimgs.pplive.cn,❌️ 广告
+  - DOMAIN,csi.gstatic.com,❌️ 广告
+  - DOMAIN,dsp.youdao.com,❌️ 广告
+  - DOMAIN,iadsdk.apple.com,❌️ 广告
+  - DOMAIN,pagead2.googlesyndication.com,❌️ 广告
+  - DOMAIN,ulogs.umengcloud.com,❌️ 广告
+  - DOMAIN,ulogs.umeng.com,❌️ 广告
+  - DOMAIN,open.e.kuaishou.com,❌️ 广告
+  - DOMAIN,api-access.pangolin-sdk-toutiao.com,❌️ 广告
+  - DOMAIN,sdk.open.talk.getui.net,❌️ 广告
+  - DOMAIN,sdk.open.talk.getui.com,❌️ 广告
+  - DOMAIN,errlog.umeng.com,❌️ 广告
+  - DOMAIN,tnc3-aliec2.snssdk.com,❌️ 广告
+  - DOMAIN,sf3-fe-tos.pglstatp-toutiao.com,❌️ 广告
+  - DOMAIN,qzs.gdtimg.com,❌️ 广告
+  - DOMAIN,stats.g.doubleclick.net,❌️ 广告
+  - DOMAIN,app-measurement.com,❌️ 广告
+  - DOMAIN,bymh26.com,❌️ 广告
+  # privacy tracker ---
+  - DOMAIN-SUFFIX,51.la,❌️ 广告
+  - DOMAIN-SUFFIX,adjust.com,❌️ 广告
+  - DOMAIN-SUFFIX,cmcore.com,❌️ 广告
+  - DOMAIN-SUFFIX,coremetrics.com,❌️ 广告
+  - DOMAIN-SUFFIX,cnzz.com,❌️ 广告
+  - DOMAIN-SUFFIX,flurry.com,❌️ 广告
+  - DOMAIN-SUFFIX,irs01.com,❌️ 广告
+  - DOMAIN-SUFFIX,madmini.com,❌️ 广告
+  - DOMAIN-SUFFIX,mixpanel.com,❌️ 广告
+  - DOMAIN-SUFFIX,mmstat.com,❌️ 广告
+  - DOMAIN-SUFFIX,wrating.com,❌️ 广告
+  - DOMAIN-KEYWORD,umeng.co,❌️ 广告
+  - DOMAIN-KEYWORD,flurry.co,❌️ 广告
+  - DOMAIN-SUFFIX,mmstat.com,❌️ 广告
+  - DOMAIN-SUFFIX,doubleclick.net,❌️ 广告
+  - DOMAIN,bam.nr-data.net,❌️ 广告
+  - DOMAIN,counter.kingsoft.com,❌️ 广告
+  - DOMAIN,js-agent.newrelic.com,❌️ 广告
+  - DOMAIN,pixel.wp.com,❌️ 广告
+  - DOMAIN,stat.m.jd.com,❌️ 广告
+  # 分流 ---
+  # OpenAI
+  - DOMAIN-SUFFIX,openai.com,🤖 OpenAI
+  - DOMAIN-SUFFIX,claude.ai,🤖 OpenAI
+  - DOMAIN-SUFFIX,bard.google.com,🤖 OpenAI
+  - DOMAIN-SUFFIX,oaistatic.com,🤖 OpenAI
+  - DOMAIN-SUFFIX,oaiusercontent.com,🤖 OpenAI
+  # discord
+  - DOMAIN,latency.discord.media,💬 即时通讯
+  - DOMAIN,gateway.discord.gg,💬 即时通讯
+  # telegram
+  - DOMAIN-SUFFIX,comments.app,💬 即时通讯
+  - DOMAIN-SUFFIX,contest.com,💬 即时通讯
+  - DOMAIN-SUFFIX,graph.org,💬 即时通讯
+  - DOMAIN-SUFFIX,quiz.directory,💬 即时通讯
+  - DOMAIN-SUFFIX,stel.com,💬 即时通讯
+  - DOMAIN-SUFFIX,t.me,💬 即时通讯
+  - DOMAIN-SUFFIX,tdesktop.com,💬 即时通讯
+  - DOMAIN-SUFFIX,telega.one,💬 即时通讯
+  - DOMAIN-SUFFIX,telegra.ph,💬 即时通讯
+  - DOMAIN-SUFFIX,telegram-cdn.org,💬 即时通讯
+  - DOMAIN-SUFFIX,telegram.dog,💬 即时通讯
+  - DOMAIN-SUFFIX,telegram.me,💬 即时通讯
+  - DOMAIN-SUFFIX,telegram.org,💬 即时通讯
+  - DOMAIN-SUFFIX,telegram.space,💬 即时通讯
+  - DOMAIN-SUFFIX,telegramdownload.com,💬 即时通讯
+  - DOMAIN-SUFFIX,telesco.pe,💬 即时通讯
+  - DOMAIN-SUFFIX,tg.dev,💬 即时通讯
+  - DOMAIN-SUFFIX,tx.me,💬 即时通讯
+  - DOMAIN-SUFFIX,usercontent.dev,💬 即时通讯
+  - DOMAIN-KEYWORD,nicegram,💬 即时通讯
+  - DOMAIN-KEYWORD,telegram,💬 即时通讯
+  - DOMAIN-KEYWORD,nekogram,💬 即时通讯
+  - GEOSITE,telegram,💬 即时通讯
+  - GEOIP,telegram,💬 即时通讯
+  - PROCESS-NAME,nekox.messenger,💬 即时通讯
+  - PROCESS-NAME,org.telegram.messenger,💬 即时通讯
+  - PROCESS-NAME,telegram.exe,💬 即时通讯
+  - IP-CIDR,109.239.140.0/24,💬 即时通讯,no-resolve
+  - IP-CIDR,149.154.160.0/20,💬 即时通讯,no-resolve
+  - IP-CIDR,185.76.151.0/24,💬 即时通讯,no-resolve
+  - IP-CIDR,5.28.195.163/32,💬 即时通讯,no-resolve
+  - IP-CIDR,5.28.195.205/32,💬 即时通讯,no-resolve
+  - IP-CIDR,91.105.192.0/23,💬 即时通讯,no-resolve
+  - IP-CIDR,91.108.0.0/16,💬 即时通讯,no-resolve
+  - IP-CIDR,91.108.56.0/22,💬 即时通讯,no-resolve
+  - IP-CIDR,91.108.4.0/22,💬 即时通讯,no-resolve
+  - IP-CIDR,95.161.64.0/20,💬 即时通讯,no-resolve
+  - IP-CIDR6,2001:67c:4e8::/48,💬 即时通讯,no-resolve
+  - IP-CIDR6,2001:b28:f23c::/47,💬 即时通讯,no-resolve
+  - IP-CIDR6,2001:b28:f23f::/48,💬 即时通讯,no-resolve
+  - IP-CIDR6,2a0a:f280::/32,💬 即时通讯,no-resolve
+  # taptap
+  - DOMAIN-SUFFIX,version.terraria.xd.com,🎮 CN Game
+  - DOMAIN-SUFFIX,xd.com,🎮 CN Game
+  - DOMAIN,online.game-security.xindong.com,🎮 CN Game
+  - DOMAIN,sentry.tapsvc.com,🎮 CN Game
+  - DOMAIN,api-sdk.xd.com,🎮 CN Game
+  - DOMAIN,taptap.com,🎮 CN Game
+  # steam
+  - DOMAIN,api.steampowered.com,🎮 Steam
+  - DOMAIN-SUFFIX,cm.steampowered.com,🎮 Steam
+  - DOMAIN-SUFFIX,steamserver.net,🎮 Steam
+  - IP-CIDR,103.10.124.0/24,🎮 Steam
+  - IP-CIDR,103.10.125.0/24,🎮 Steam
+  - IP-CIDR,103.28.54.0/24,🎮 Steam
+  - IP-CIDR,146.66.152.0/24,🎮 Steam
+  - IP-CIDR,146.66.155.0/24,🎮 Steam
+  - IP-CIDR,153.254.86.0/24,🎮 Steam
+  - IP-CIDR,155.133.224.0/23,🎮 Steam
+  - IP-CIDR,155.133.226.0/24,🎮 Steam
+  - IP-CIDR,155.133.227.0/24,🎮 Steam
+  - IP-CIDR,155.133.230.0/24,🎮 Steam
+  - IP-CIDR,155.133.232.0/24,🎮 Steam
+  - IP-CIDR,155.133.233.0/24,🎮 Steam
+  - IP-CIDR,155.133.234.0/24,🎮 Steam
+  - IP-CIDR,155.133.236.0/23,🎮 Steam
+  - IP-CIDR,155.133.238.0/24,🎮 Steam
+  - IP-CIDR,155.133.239.0/24,🎮 Steam
+  - IP-CIDR,155.133.240.0/23,🎮 Steam
+  - IP-CIDR,155.133.245.0/24,🎮 Steam
+  - IP-CIDR,155.133.246.0/24,🎮 Steam
+  - IP-CIDR,155.133.248.0/24,🎮 Steam
+  - IP-CIDR,155.133.249.0/24,🎮 Steam
+  - IP-CIDR,155.133.250.0/24,🎮 Steam
+  - IP-CIDR,155.133.251.0/24,🎮 Steam
+  - IP-CIDR,155.133.252.0/24,🎮 Steam
+  - IP-CIDR,155.133.253.0/24,🎮 Steam
+  - IP-CIDR,155.133.254.0/24,🎮 Steam
+  - IP-CIDR,155.133.255.0/24,🎮 Steam
+  - IP-CIDR,162.254.192.0/24,🎮 Steam
+  - IP-CIDR,162.254.193.0/24,🎮 Steam
+  - IP-CIDR,162.254.194.0/23,🎮 Steam
+  - IP-CIDR,162.254.195.0/24,🎮 Steam
+  - IP-CIDR,162.254.196.0/24,🎮 Steam
+  - IP-CIDR,162.254.197.0/24,🎮 Steam
+  - IP-CIDR,162.254.198.0/24,🎮 Steam
+  - IP-CIDR,162.254.199.0/24,🎮 Steam
+  - IP-CIDR,185.25.182.0/24,🎮 Steam
+  - IP-CIDR,185.25.183.0/24,🎮 Steam
+  - IP-CIDR,190.217.33.0/24,🎮 Steam
+  - IP-CIDR,192.69.96.0/22,🎮 Steam
+  - IP-CIDR,205.185.194.0/24,🎮 Steam
+  - IP-CIDR,205.196.6.0/24,🎮 Steam
+  - IP-CIDR,208.64.200.0/24,🎮 Steam
+  - IP-CIDR,208.64.201.0/24,🎮 Steam
+  - IP-CIDR,208.64.202.0/24,🎮 Steam
+  - IP-CIDR,208.64.203.0/24,🎮 Steam
+  - IP-CIDR,208.78.164.0/22,🎮 Steam
+  # spotify
+  - GEOSITE,spotify,🖥 流媒体
+  - IP-CIDR,35.186.224.47/32,🖥 流媒体
+  - DOMAIN-SUFFIX,byspotify.com,🖥 流媒体
+  - DOMAIN-SUFFIX,pscdn.co,🖥 流媒体
+  - DOMAIN-SUFFIX,scdn.co,🖥 流媒体
+  - DOMAIN-SUFFIX,spoti.fi,🖥 流媒体
+  - DOMAIN-SUFFIX,spotify-com.akamaized.net,🖥 流媒体
+  - DOMAIN-SUFFIX,spotify-everywhere.com,🖥 流媒体
+  - DOMAIN-SUFFIX,spotify.com,🖥 流媒体
+  - DOMAIN-SUFFIX,spotify.design,🖥 流媒体
+  - DOMAIN-SUFFIX,spotifycdn.com,🖥 流媒体
+  - DOMAIN-SUFFIX,spotifycdn.net,🖥 流媒体
+  - DOMAIN-SUFFIX,spotifycharts.com,🖥 流媒体
+  - DOMAIN-SUFFIX,spotifycodes.com,🖥 流媒体
+  - DOMAIN-SUFFIX,spotifyforbrands.com,🖥 流媒体
+  - DOMAIN-SUFFIX,spotifyjobs.com,🖥 流媒体
+  - DOMAIN-KEYWORD,-spotify-com,🖥 流媒体
+  - DOMAIN-KEYWORD,spotify.com,🖥 流媒体
+  # apple
+  - DOMAIN-SUFFIX,aaplimg.com,🍎 Apple
+  - DOMAIN-SUFFIX,apple.co,🍎 Apple
+  - DOMAIN-SUFFIX,apple.com,🍎 Apple
+  - DOMAIN-SUFFIX,apple.com.cn,🍎 Apple
+  - DOMAIN-SUFFIX,apple-cloudkit.com,🍎 Apple
+  - DOMAIN-SUFFIX,appstore.com,🍎 Apple
+  - DOMAIN-SUFFIX,cdn-apple.com,🍎 Apple
+  - DOMAIN-SUFFIX,crashlytics.com,🍎 Apple
+  - DOMAIN-SUFFIX,icloud.com,🍎 Apple
+  - DOMAIN-SUFFIX,icloud.com.cn,🍎 Apple
+  - DOMAIN-SUFFIX,icloud-content.com,🍎 Apple
+  - DOMAIN-SUFFIX,me.com,🍎 Apple
+  - DOMAIN-SUFFIX,mzstatic.com,🍎 Apple
+  - DOMAIN,www-cdn.icloud.com.akadns.net,🍎 Apple
+  # bilibili
+  - GEOSITE,bilibili,🖥 哔哩哔哩
+  # ?
+  - GEOSITE,twitter,📫 社交媒体
+  - GEOSITE,youtube,🖥 流媒体
+  - GEOSITE,google,📰 Google
+  - GEOSITE,telegram,💬 即时通讯
+  - GEOSITE,netflix,🖥 流媒体
+  - GEOSITE,geolocation-!cn,🐟 漏网之鱼
+  - GEOIP,google,📰 Google
+  - GEOIP,netflix,🖥 流媒体
+  # ?
+  - GEOIP,twitter,📫 社交媒体
+  # 省流 ---
+  # Tencent
+  - DOMAIN,fairplay.l.qq.com,DIRECT
+  - DOMAIN,livew.l.qq.com,DIRECT
+  - DOMAIN,vd.l.qq.com,DIRECT
+  # ?
+  - DOMAIN-SUFFIX,jd.hk,DIRECT
+  - DOMAIN-SUFFIX,jdpay.com,DIRECT
+  - DOMAIN-SUFFIX,360buyimg.com,DIRECT
+  - DOMAIN-SUFFIX,gov.hk,DIRECT
+  - DOMAIN-SUFFIX,gov.mo,DIRECT
+  - DOMAIN-SUFFIX,gov.cn,DIRECT
+  - DOMAIN-SUFFIX,un.org,DIRECT
+  - DOMAIN-SUFFIX,kookapp.cn,DIRECT
+  - DOMAIN-SUFFIX,gitee.com,DIRECT
+  - DOMAIN-SUFFIX,gitee.cn,DIRECT
+  - DOMAIN-SUFFIX,mtr.com.hk,DIRECT
+  - PROCESS-NAME,com.kmb.app1933,DIRECT
+  # alibaba
+  - DOMAIN-SUFFIX,taobao.com,DIRECT
+  - DOMAIN-SUFFIX,alicdn.com,DIRECT
+  # iqiyi
+  - DOMAIN,t7z.cupid.iqiyi.com,DIRECT
+  # baidu
+  - DOMAIN-SUFFIX,baidu.com,DIRECT
+  # lan
+  - DOMAIN,snapdrop.net,DIRECT
+  - DOMAIN-SUFFIX,snapdrop.net,DIRECT
+  - DOMAIN,pairdrop.net,DIRECT
+  - DOMAIN-SUFFIX,pairdrop.net,DIRECT
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+  - GEOIP,LAN,DIRECT,no-resolve
+  # ---
+  - GEOSITE,CN,DIRECT
+  - GEOIP,CN,DIRECT,no-resolve
+  - MATCH,🐟 漏网之鱼
