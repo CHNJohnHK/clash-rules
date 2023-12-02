@@ -8,7 +8,8 @@ payload:
   - '+.adjust.com'
   - '+.data.vod.itc.cn'
   - '+.tanx.com'
-  - '+.irs01.com'
+  - '+.adwo.com'
+  - '+.irs01.com' #
   - '+.flurry.com'
   - '+.madmini.com'
   - '+.mixpanel.com'
